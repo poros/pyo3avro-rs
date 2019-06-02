@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use avro_rs::from_avro_datum;
 use avro_rs::to_avro_datum;
 use avro_rs::types::Value;
-use avro_rs::Schema;
+use avro_rs::Schema as SchemaRs;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
 use pyo3::PyDowncastError;
@@ -22,16 +22,16 @@ impl IntoPyObject for Bytes {
 }
 
 #[pyclass]
-struct AvroSchema {
-    schema: Schema,
+struct Schema {
+    schema: SchemaRs,
 }
 
 #[pymethods]
-impl AvroSchema {
+impl Schema {
     #[new]
     fn __new__(obj: &PyRawObject, input: String) {
-        obj.init(AvroSchema {
-            schema: Schema::parse_str(&input).unwrap(), // TODO
+        obj.init(Schema {
+            schema: SchemaRs::parse_str(&input).unwrap(), // TODO
         })
     }
 
@@ -88,41 +88,41 @@ fn to_pyobject(py: Python, datum: Value) -> PyObject {
     }
 }
 
-fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Value> {
+fn to_avro_value(py: Python, datum: &PyObject, schema: &SchemaRs) -> PyResult<Value> {
     match schema {
-        &Schema::Null if datum.is_none() => Ok(Value::Null),
-        &Schema::Null => Err(PyErr::from(PyDowncastError)),
-        &Schema::Boolean => {
+        &SchemaRs::Null if datum.is_none() => Ok(Value::Null),
+        &SchemaRs::Null => Err(PyErr::from(PyDowncastError)),
+        &SchemaRs::Boolean => {
             let b = datum.extract::<bool>(py)?;
             Ok(Value::Boolean(b))
         }
-        &Schema::Int => {
+        &SchemaRs::Int => {
             // TODO: PyInt/PyLong?
             let n = datum.extract::<i32>(py)?;
             Ok(Value::Int(n))
         }
-        &Schema::Long => {
+        &SchemaRs::Long => {
             // TODO: PyInt/PyLong?
             let n = datum.extract::<i64>(py)?;
             Ok(Value::Long(n))
         }
-        &Schema::Float => {
+        &SchemaRs::Float => {
             let x = datum.extract::<f32>(py)?;
             Ok(Value::Float(x))
         }
-        &Schema::Double => {
+        &SchemaRs::Double => {
             let x = datum.extract::<f64>(py)?;
             Ok(Value::Double(x))
         }
-        &Schema::Bytes => {
+        &SchemaRs::Bytes => {
             let bytes = datum.extract::<Vec<u8>>(py)?;
             Ok(Value::Bytes(bytes))
         }
-        &Schema::String => {
+        &SchemaRs::String => {
             let string = datum.extract::<String>(py)?;
             Ok(Value::String(string))
         }
-        &Schema::Array(ref inner) => {
+        &SchemaRs::Array(ref inner) => {
             // TODO: PyTuple?
             let array = datum.extract::<Vec<PyObject>>(py)?;
             let items = array
@@ -131,7 +131,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
                 .collect::<PyResult<Vec<Value>>>()?;
             Ok(Value::Array(items))
         }
-        &Schema::Map(ref inner) => {
+        &SchemaRs::Map(ref inner) => {
             let items = datum
                 .cast_as::<PyDict>(py)?
                 .iter()
@@ -145,7 +145,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
 
             Ok(Value::Map(items))
         }
-        &Schema::Union(ref inner) => {
+        &SchemaRs::Union(ref inner) => {
             // Optimization for when union is used for optional values
             if inner.is_nullable() && datum.is_none() {
                 Ok(Value::Union(Box::new(Value::Null)))
@@ -161,7 +161,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
                 Err(PyErr::from(PyDowncastError))
             }
         }
-        &Schema::Record {
+        &SchemaRs::Record {
             ref fields,
             ref lookup,
             ..
@@ -185,7 +185,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
 
             Ok(Value::Record(rfields))
         }
-        &Schema::Enum { ref symbols, .. } => {
+        &SchemaRs::Enum { ref symbols, .. } => {
             let string = datum.extract::<String>(py);
             if let Ok(string) = string {
                 if let Some(index) = symbols.iter().position(|ref item| item == &&string) {
@@ -202,7 +202,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
                 }
             }
         }
-        &Schema::Fixed { .. } => {
+        &SchemaRs::Fixed { .. } => {
             let bytes = datum.extract::<Vec<u8>>(py)?;
             Ok(Value::Fixed(bytes.len(), bytes))
         }
@@ -211,7 +211,7 @@ fn to_avro_value(py: Python, datum: &PyObject, schema: &Schema) -> PyResult<Valu
 
 #[pymodule]
 fn pyo3avro_rs(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<AvroSchema>()?;
+    m.add_class::<Schema>()?;
     Ok(())
 }
 

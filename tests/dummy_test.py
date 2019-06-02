@@ -1,6 +1,6 @@
-from pyo3avro_rs import AvroSchema
+from pyo3avro_rs import Schema
 
 
 def test_dummy() -> None:
-    schema = AvroSchema('{"type": "string"}')
+    schema = Schema('{"type": "string"}')
     assert schema is not None
