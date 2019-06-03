@@ -30,11 +30,13 @@ struct Schema {
 #[pymethods]
 impl Schema {
     #[new]
-    fn __new__(obj: &PyRawObject, input: String) {
+    fn __new__(obj: &PyRawObject, input: String) -> PyResult<()> {
         match SchemaRs::parse_str(&input) {
-            Ok(schema) => obj.init(Schema { schema }),
-            Err(e) => PyErr::new::<exceptions::ValueError, _>(format!("{}", e.as_fail()))
-                .restore(Python::acquire_gil().python()),
+            Ok(schema) => Ok(obj.init(Schema { schema })),
+            Err(e) => Err(PyErr::new::<exceptions::ValueError, _>(format!(
+                "{}",
+                e.as_fail()
+            ))),
         }
     }
 
